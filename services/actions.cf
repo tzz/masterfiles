@@ -1,0 +1,80 @@
+bundle agent actions
+{
+  methods:
+      "j" usebundle => actions_jenkins();
+      "g" usebundle => actions_github();
+}
+
+bundle agent actions_jenkins
+{
+  vars:
+      "deploy_target" string => "/var/tmp/deployment";
+
+  commands:
+    recent_ok::
+      # iff the deployment works, we will cancel the jenkinsnotify class.
+
+      # Note that this rsync call is just an example, you can do file
+      # copies with CFEngine just as easily.  The key here is that
+      # $(notifications.workspace) is coming from the last successful
+      # Jenkins build that hasn't been deployed.
+
+      "/usr/bin/rsync -a --delete $(notifications.workspace)/myartifacts/ $(deploy_target)/"
+      classes => if_ok_set_and_cancel("deployment_ok", "jenkinsnotify");
+
+  reports:
+    deploy_ok::
+      "Deployment script enabled";
+
+    recent_ok::
+      "The build succeeded recently!  Deploying from $(notifications.workspace) to $(deploy_target)";
+
+    deployment_ok::
+      "The build was deployed successfully to $(deploy_target)";
+
+    recent_ok.jenkinsnotify.!deployment_ok::
+      "The build was NOT deployed successfully, check the logs ";
+}
+
+body classes if_ok_set_and_cancel(set, cancel)
+{
+      promise_repaired => { "$(set)" };
+      promise_kept => { "$(set)" };
+      cancel_repaired => { "default:$(cancel)", "$(cancel)" };
+      cancel_kept => { "default:$(cancel)", "$(cancel)" };
+}
+
+bundle agent actions_github
+{
+  vars:
+      "deploy_target" string => "/var/tmp/deployment-github";
+      "repo" string => "https://github.com/cfengine/vagrant-cfe.git";
+      "branch" string => "master";
+
+  classes:
+      "notarget" not => fileexists("$(deploy_target)");
+      "cloned" expression => fileexists("$(deploy_target)/.git");
+      "not_cloned" not => fileexists("$(deploy_target)/.git");
+
+  commands:
+      # iff the deployment works, we will cancel the $(notifications_github.persist) class.
+      # Note this git clone is just an example!
+    github_got_update.cloned::
+      "/usr/bin/git pull $(repo) $(branch)"
+      contain => in_dir($(deploy_target)),
+      classes => if_ok("deployment_ok");
+
+    notarget||(github_got_update.not_cloned)::
+      "/usr/bin/git clone -b $(branch) $(repo) $(deploy_target)/"
+      classes => if_ok("deployment_ok");
+
+  reports:
+    !github_got_update::
+      "The $(notifications_github.feed) update $(notifications_github.persist) was already known";
+
+    github_got_update::
+      "The $(notifications_github.feed) update $(notifications_github.persist) is news to us";
+
+    deployment_ok::
+      "The new clone of $(repo) was deployed successfully to $(deploy_target)";
+}

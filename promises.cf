@@ -58,6 +58,8 @@ body common control
                   # List of services here
 		  "services/init_msg.cf",
                   "services/file_change.cf",
+                  "services/notifications.cf",
+                  "services/actions.cf",
 
       };
 
@@ -134,5 +136,13 @@ bundle agent service_catalogue
       "INIT MSG" usebundle => init_msg,
       comment => "Just a pre-defined policy bundled with the package",
       handle => "main_methods_any_init_msg";
+
+      "notifications" usebundle => notifications,
+      comment => "Pick up notifications",
+      handle => "main_methods_any_notifications";
+
+      "actions" usebundle => actions,
+      comment => "Perform actions",
+      handle => "main_methods_any_actions";
 
 }

@@ -1,0 +1,85 @@
+bundle agent notifications
+{
+  methods:
+      "j" usebundle => notifications_jenkins();
+      "g" usebundle => notifications_github();
+}
+
+bundle agent notifications_jenkins
+{
+  classes:
+      "deploy_ok"
+      expression => "jenkins_module_loaded",
+      scope => "namespace";
+
+    deploy_ok::
+      # the jenkinsnotify class is defined by the Jenkins plugin
+      "recent_ok" expression => "jenkinsnotify",
+      scope => "namespace";
+
+  vars:
+    deploy_ok::
+      "workspace" string => $(jenkins_postbuild.WORKSPACE);
+
+  commands:
+      "/tmp/jenkins-postbuild"
+      module => "true";
+}
+
+bundle agent notifications_github
+{
+  vars:
+      "feed" string => "https://github.com/cfengine/vagrant-cfe/commits/master.atom",
+      comment => "Atom feed parsed for the interesting timestamp";
+
+      "persist" string => canonify(concat("_github_persist_update_",
+                                          $(feed),
+                                          "_",
+                                          $(curl.updated))),
+      handle => "notifications_github_persist_var";
+
+  commands:
+      # we will look for a timestamp like <updated>2013-10-03T11:26:50-07:00</updated>
+      "/usr/bin/curl -s '$(feed)' | /usr/bin/perl -MPOSIX -n -e 'next unless m/\\Dupdated\\D+(\\d.+T.+\\d)\\D+updated/; print \"=updated=$1\\n\"; exit;'"
+      handle => "notifications_github_curl",
+      module => "true",
+      contain => in_shell;
+
+  methods:
+      "check if known" usebundle => notifications_github_check($(persist)),
+      depends_on => { "notifications_github_persist_var" },
+      handle => "notifications_github_check";
+
+      "set persistent" usebundle => notifications_github_set($(persist)),
+      depends_on => { "notifications_github_persist_var",
+                      "notifications_github_check" };
+
+  reports:
+    inform_mode::
+      "Last updated $(feed) = $(curl.updated)";
+}
+
+bundle agent notifications_github_check(pname)
+{
+  classes:
+      "github_got_update" not => $(pname),
+      scope => "namespace";
+
+  reports:
+    inform_mode::
+      "$(this.bundle): Checking if $(pname) is defined";
+
+      "$(this.bundle): $(pname) is defined" ifvarclass => $(pname);
+      "$(this.bundle): $(pname) is NOT defined" ifvarclass => "!$(pname)";
+
+      "$(this.bundle): github_got_update is defined" ifvarclass => "github_got_update";
+      "$(this.bundle): github_got_update is NOT defined" ifvarclass => "!github_got_update";
+
+}
+
+bundle agent notifications_github_set(pname)
+{
+  classes:
+      "$(pname)" expression => "any",
+      persistence => "90m"; # persist for a VERY long time
+}
