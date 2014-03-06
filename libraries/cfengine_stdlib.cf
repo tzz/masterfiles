@@ -1727,7 +1727,7 @@ body package_method zypper
       package_list_command => "$(paths.path[rpm]) -qa --queryformat \"i | repos | %{name} | %{version}-%{release} | %{arch}\n\"";
 
       # set it to "0" to avoid caching of list during upgrade
-      package_list_update_command => "$(paths.path[zypper]) list-updates";
+      package_list_update_command => "$(paths.path[zypper]) refresh";
       package_list_update_ifelapsed => "240";
 
       package_patch_list_command => "$(paths.path[zypper]) patches";
@@ -2555,7 +2555,7 @@ body package_method generic
       package_changes => "bulk";
       package_list_command => "$(paths.path[rpm]) -qa --queryformat \"i | repos | %{name} | %{version}-%{release} | %{arch}\n\"";
       # set it to "0" to avoid caching of list during upgrade
-      package_list_update_command => "$(paths.path[zypper]) list-updates";
+      package_list_update_command => "$(paths.path[zypper]) refresh";
       package_list_update_ifelapsed => "0";
       package_patch_list_command => "$(paths.path[zypper]) patches";
       package_installed_regex => "i.*";
